@@ -1,0 +1,32 @@
+<Rule id="">
+    <on>
+        <Happens>
+            <Event id="" title="">
+                <slot title="">
+                    <Ind value=""/>
+                    <Ind value=""/>
+                </slot>
+            </Event>
+            <Time value=""></Time>
+        </Happens>
+    </on>
+    <if>
+        <HoldsAt></HoldsAt>
+    </if>
+    <do>
+        <Event id="" title="">
+            <slot title="">
+                <Ind value=""/>
+                <Ind value=""/>
+            </slot>
+        </Event>
+        <X address=""></X>
+        <C action="" type="" id="" title="" role="" state="" record="">
+            <X address=""></X>
+            <Y address=""></Y>
+            <P title="" value="" atomic=""></P>
+            <Q title="" value ="" atomic=""></Q>
+        </C>
+        <Time value=""/>
+    </do>
+</Rule>
