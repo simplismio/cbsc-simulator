@@ -32,27 +32,34 @@ contract("CBSC Simulation", async (accounts) => {
         return events;
     }
 
-    async function queryIterationData(_iteration_counter) {
-
-        let { data: iteration, error } = await supabase
-            .from('iterations')
+    async function getActionCounter(){
+         let { data: actions, error } = await supabase
+            .from('actions')
             .select(`
-                    iteration,
-                    attempt,
-                    action,
+                    id
+                `)
+        return actions[0].id
+    }
+
+    async function queryActionData(_action_counter) {
+
+        let { data: action, error } = await supabase
+            .from('actions')
+            .select(`
+                    fulfillment_value,
+                    message,
+                    state,
                     events (
                         id, title
                     ),
-                    fluents (
-                        id, value, balance, faction, atomic,
-                        commitments (
-                        id, title
-                        )
+                    commitments (
+                        id, title, state, debtor, creditor, fluents (
+                        id, title, atomic, balance, max_terms, terms_left, original_balance
+                    )
                     )
                 `)
-            .eq('id', _iteration_counter);
-        console.log(iteration);
-        return iteration[0];
+            .eq('id', _action_counter);
+        return action[0];
     }
 
     async function insertPartialFulfillment(_id, _event_id, _iteration, _fluent_id, _attempt, _action, _origin, _faction) {
@@ -76,37 +83,34 @@ contract("CBSC Simulation", async (accounts) => {
         return data;
     }
 
-    async function insertTransaction(_event_id, _iteration, _attempt, _commitment_id, _action, _hash, _time, _origin) {
+    async function insertHash(_action_id, _hash) {
         const { data, error } = await supabase
-            .from('transactions')
-            .insert([
+            .from('actions')
+            .update([
                 {
-                    event_id: _event_id,
-                    iteration: _iteration,
-                    attempt: _attempt,
-                    commitment_id: _commitment_id,
-                    action: _action,
                     hash: _hash,
-                    time: _time,
-                    origin: _origin
+                    hash_timestamp: Math.floor(Date.now() / 1000)
                 }]
-            )
-        return data;
+            ).
+            eq('id', _action_id)
+            console.log(data)
+            console.log(error)
+        return ;
     }
 
-    async function updateFluentBalance(_fluent_id, _current_balance, _balance, _faction) {
+    // async function updateFluentBalance(_fluent_id, _current_balance, _balance, _faction) {
 
 
-        const { data, error } = await supabase
-            .from('fluents')
-            .update({
-                'balance': _current_balance - _balance,
-                'faction': _faction
-            })
-            .eq('id', _fluent_id)
-        return data;
+    //     const { data, error } = await supabase
+    //         .from('fluents')
+    //         .update({
+    //             'balance': _current_balance - _balance,
+    //             'faction': _faction
+    //         })
+    //         .eq('id', _fluent_id)
+    //     return data;
 
-    }
+    // }
 
     async function writeRuleMLOutput(time, json) {
         /*
@@ -132,36 +136,6 @@ contract("CBSC Simulation", async (accounts) => {
     before('Preparing CBSC', async () => {
         instance = await CBSC.deployed();
 
-        /* Clear old transactions in the cloud */
-        async function clearTransactions() {
-            let {
-                data,
-                error,
-                count
-            } = await supabase
-                .from('transactions')
-                .select('id', {}, {
-                    count: 'exact'
-                });
-
-            if (data == '') {
-                var start = 0;
-                var counter = 0;
-            } else {
-                var start = data[0].id;
-                var counter = data[0].id + data.length;
-            }
-
-            for (var i = start ?? 0; i < counter; i++) {
-                await supabase
-                    .from('transactions')
-                    .delete()
-                    .match({
-                        id: i
-                    })
-            }
-        }
-        await clearTransactions();
         /*
          * Setup roles for test, defaults to x & y
          * Optional functions to delegate or assign
@@ -197,7 +171,7 @@ contract("CBSC Simulation", async (accounts) => {
     it("CBSC Protocol Run", async () => {
 
         let event_counter = 1;
-        let iteration_counter = 1;
+        let db_action_counter = await getActionCounter();
         let origin = "SA";
         let faction;
 
@@ -205,18 +179,20 @@ contract("CBSC Simulation", async (accounts) => {
 
         while (event_counter <= events.length) {
 
-            let iteration = await queryIterationData(iteration_counter);
+            let action = await queryActionData(db_action_counter);
+            let code_action_counter = 1
+            let _attempt = 0
 
-            if (iteration == null) {
-                console.log('Iteration finished');
+            if (action == null) {
+                console.log('Action finished');
                 event_counter++;
             }
             else {
 
                 /* manipulate commitment ton the on-chain ledger */
-                switch (iteration.action) {
-                    case 'commit':
-                        await instance.commit(iteration.fluents.commitments.id, buyer, seller, iteration.fluents.id, iteration.fluents.value, iteration.fluents.atomic);
+                switch (action.state) {
+                    case 'committed':
+                        await instance.commit(action.commitments.id, buyer, seller, action.commitments.fluents[0].id, action.commitments.fluents[0].balance, action.commitments.fluents[0].atomic);
 
                         assert.equal(
                             'committed',
@@ -225,8 +201,8 @@ contract("CBSC Simulation", async (accounts) => {
                         );
 
                         break;
-                    case 'activate':
-                        await instance.activate(iteration.fluents.commitments.id, buyer);
+                    case 'activated':
+                        await instance.activate(action.commitments.id, buyer);
 
                         assert.equal(
                             'activated',
@@ -235,25 +211,31 @@ contract("CBSC Simulation", async (accounts) => {
                         );
 
                         break;
-                    case 'satisfy':
-                        await instance.satisfy(iteration.fluents.id, iteration.fluents.commitments.id, (iteration.fluents.balance / iteration.fluents.faction));
+                    case 'satisfied':
+                        await instance.satisfy(action.commitments.fluents[0].id, action.commitments.id, (iteration.commitments.fluents[0].balance / iteration.commitments.fluents[0].max_terms));
 
-                        if (balance != undefined) {
-
-                            origin = "A";
-                            faction = 1;
-
-                            await updateFluentBalance(iteration.fluents.id, iteration.fluents.balance, balance, faction);
-
-                            await insertPartialFulfillment((iteration_counter + 1), iteration.events.id, iteration.iteration, iteration.fluents.id, iteration.attempt++, iteration.action, origin);
-                        }
-                        else {
-                            assert.equal(
+                                                    assert.equal(
                                 'satisfied',
                                 state,
                                 "Saving state failed"
                             );
-                        }
+
+                        // if (balance != undefined) {
+
+                        //     origin = "A";
+                        //     faction = 1;
+
+                        //     await updateFluentBalance(iteration.fluents.id, iteration.fluents.balance, balance, faction);
+
+                        //     await insertPartialFulfillment((iteration_counter + 1), iteration.events.id, iteration.iteration, iteration.fluents.id, iteration.attempt++, iteration.action, origin);
+                        // }
+                        // else {
+                        //     assert.equal(
+                        //         'satisfied',
+                        //         state,
+                        //         "Saving state failed"
+                        //     );
+                        // }
                         break;
                     case 'cancel':
 
@@ -269,10 +251,10 @@ contract("CBSC Simulation", async (accounts) => {
                 }
 
                 /* set the time */
-                let time = iteration.events.id + "." + iteration.iteration + "." + iteration.attempt;
+                let time = event_counter + "." + code_action_counter + "." + _attempt;
 
-                /* insert transaction into off-chain ledger */
-                let transaction = await insertTransaction(iteration.events.id, iteration.iteration, iteration.attempt, iteration.fluents.commitments.id, iteration.action, hash, time, origin);
+                /* insert hash and timestamp to action */
+                await insertHash(db_action_counter, hash);
 
                 /* update the RuleMl template */
                 let ruleMLTemplate = fs.readFileSync("test/ruleml/template.ruleml", 'utf8');
@@ -281,8 +263,10 @@ contract("CBSC Simulation", async (accounts) => {
                     object: true
                 });
 
+
                 /* insert data into the RuleMl template */
-                templateJson.Rule.on.Happens.Event.id = iteration.events.id;
+                templateJson.Rule.on.Happens.Event.id = action.events.id;
+                templateJson.Rule.on.Happens.Event.id = action.events.title;
                 await writeRuleMLOutput(time, templateJson);
 
                 /* Comparing blockchain hash to cloud hash */
@@ -297,7 +281,8 @@ contract("CBSC Simulation", async (accounts) => {
                 console.log('Protocol run completed');
             }
 
-            iteration_counter++;
+            db_action_counter++;
+            code_action_counter
         }
 
         // assert.equal(

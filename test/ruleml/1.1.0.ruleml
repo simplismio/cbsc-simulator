@@ -1,7 +1,7 @@
 <Rule id="">
     <on>
         <Happens>
-            <Event id="1" title="">
+            <Event id="Hiring" title="">
                 <slot title="">
                     <Ind value=""></Ind>
                     <Ind value=""></Ind>
