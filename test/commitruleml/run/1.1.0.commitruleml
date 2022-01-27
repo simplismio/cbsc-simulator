@@ -1,0 +1,48 @@
+<Rule signature="">
+    <Assert>
+        <on>
+            <Happens>
+                <Event id="224" title="">
+                    <slot title="">
+                        <Ind value=""></Ind>
+                    </slot>
+                </Event>
+                <Time event="" action="" iteration=""></Time>
+            </Happens>
+        </on>
+        <if>
+            <HoldsAt>
+                <Commitment id="" type="" title="" role="" state="">
+                    <Agent address="" type=""></Agent>
+                    <Agent address="" type=""></Agent>
+                    <Fluent id="" type="" title="" value="" balance="" original_balance="" atomic="">
+                        <Start event="" action="" iteration=""></Start>
+                        <End event="" action="" iteration=""></End>
+                    </Fluent>
+                </Commitment>
+            </HoldsAt>
+            <Action id="" type="" title="" message="">
+                <Commitment id="" type="" title="" role="" state="">
+                    <Agent address="" type=""></Agent>
+                    <Agent address="" type=""></Agent>
+                    <Fluent id="" type="" title="" value="" balance="" original_balance="" atomic="">
+                        <Start event="" action="" iteration=""></Start>
+                        <End event="" action="" iteration=""></End>
+                    </Fluent>
+                </Commitment>
+            </Action>
+        </if>
+        <do>
+            <Action id="" type="" title="" message="">
+                <Commitment id="2" type="" title="" role="" state="">
+                    <Agent address="13" type=""></Agent>
+                    <Agent address="13" type=""></Agent>
+                    <Fluent id="11" type="" title="" value="" balance="" original_balance="" atomic="">
+                        <Start event="" action="" iteration=""></Start>
+                        <End event="" action="" iteration=""></End>
+                    </Fluent>
+                </Commitment>
+            </Action>
+        </do>
+    </Assert>
+</Rule>

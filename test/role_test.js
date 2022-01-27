@@ -7,7 +7,6 @@ contract("CBSC Simulation", async (accounts) => {
     const sb = require('@supabase/supabase-js');
     const formatXml = require("xml-formatter");
     const xmlParser = require("xml2json");
-    const config = JSON.parse(fs.readFileSync('./test/config.json', 'utf8'));
     const supabase = sb.createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
     let x = accounts[1];
@@ -98,20 +97,6 @@ contract("CBSC Simulation", async (accounts) => {
         return ;
     }
 
-    // async function updateFluentBalance(_fluent_id, _current_balance, _balance, _faction) {
-
-
-    //     const { data, error } = await supabase
-    //         .from('fluents')
-    //         .update({
-    //             'balance': _current_balance - _balance,
-    //             'faction': _faction
-    //         })
-    //         .eq('id', _fluent_id)
-    //     return data;
-
-    // }
-
     async function writeRuleMLOutput(time, json) {
         /*
          * Write transaction hash back protocol run and store it in bc-output.xml
@@ -179,6 +164,16 @@ contract("CBSC Simulation", async (accounts) => {
 
         while (event_counter <= events.length) {
 
+            /* Read the CommitRuleML template */
+            let ruleMLTemplate = fs.readFileSync("test/commitruleml/input/template.commitruleml", 'utf8');
+            templateJson = xmlParser.toJson(ruleMLTemplate, {
+                reversible: true,
+                object: true
+            });
+
+            console.log(templateJson)
+
+
             let action = await queryActionData(db_action_counter);
             let code_action_counter = 1
             let _attempt = 0
@@ -212,7 +207,7 @@ contract("CBSC Simulation", async (accounts) => {
 
                         break;
                     case 'satisfied':
-                        await instance.satisfy(action.commitments.fluents[0].id, action.commitments.id, (iteration.commitments.fluents[0].balance / iteration.commitments.fluents[0].max_terms));
+                        await instance.satisfy(action.commitments.fluents[0].id, action.commitments.id, action.fulfillment_value);
 
                                                     assert.equal(
                                 'satisfied',
@@ -254,7 +249,7 @@ contract("CBSC Simulation", async (accounts) => {
                 let time = event_counter + "." + code_action_counter + "." + _attempt;
 
                 /* insert hash and timestamp to action */
-                await insertHash(db_action_counter, hash);
+                let insertHash = await insertHash(db_action_counter, hash);
 
                 /* update the RuleMl template */
                 let ruleMLTemplate = fs.readFileSync("test/ruleml/template.ruleml", 'utf8');
@@ -267,14 +262,15 @@ contract("CBSC Simulation", async (accounts) => {
                 /* insert data into the RuleMl template */
                 templateJson.Rule.on.Happens.Event.id = action.events.id;
                 templateJson.Rule.on.Happens.Event.id = action.events.title;
+
                 await writeRuleMLOutput(time, templateJson);
 
                 /* Comparing blockchain hash to cloud hash */
-                // assert.equal(
-                //     transaction[0].hash,
-                //     hash,
-                //     "Saving state failed"
-                // );
+                assert.equal(
+                    insertHash,
+                    hash,
+                    "Saving state failed"
+                );
 
             }
             if (event_counter > events.length) {
@@ -284,15 +280,6 @@ contract("CBSC Simulation", async (accounts) => {
             db_action_counter++;
             code_action_counter
         }
-
-        // assert.equal(
-        //     'committed',
-        //     state,
-        //     "On-chain state does not match off-chain input"
-        // );
-
-
-
 
     });
 });
