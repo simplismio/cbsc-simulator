@@ -45,13 +45,14 @@ contract("CBSC Simulation", async (accounts) => {
         `
                     fulfillment_value,
                     message,
-                    state,
+                    transition,
+                    operation,
                     events (
                         id, title
                     ),
                     commitments (
                         id, title, state, debtor, creditor, fluents (
-                        id, title, atomic, balance, max_terms, terms_left, original_balance
+                        id, title, atomic, balance, max_terms, terms_left, original_balance, start, end
                     )
                     )
                 `
@@ -104,7 +105,7 @@ contract("CBSC Simulation", async (accounts) => {
      * Write transaction hash back protocol run and store it in bc-output.xml
      * */
     fs.writeFile(
-      "test/commitruleml/run/" + time + ".commitruleml",
+      "test/commitruleml/run/run-" + time + ".commitruleml",
       formatXml(xmlParser.toXml(json), {
         collapseContent: false,
       }),
@@ -113,7 +114,9 @@ contract("CBSC Simulation", async (accounts) => {
           console.log("Unable to write RuleML file");
         } else {
           console.log();
-          console.log("  RuleML template file " + time + ".ruleml generated");
+          console.log(
+            "  RuleML template file run-" + time + ".ruleml generated"
+          );
           console.log();
         }
       }
@@ -153,16 +156,14 @@ contract("CBSC Simulation", async (accounts) => {
   });
 
   it("CBSC Protocol Run", async () => {
-    let event_counter = 1;
-    let db_action_counter = await getActionCounter();
-    let code_action_counter = 1;
-    let iteration = 0;
-    let origin = "SA";
-    let faction;
+    let _event_counter = 1;
+    let _db_action_counter = await getActionCounter();
+    let _code_action_counter = 1;
+    let _iteration = 0;
 
-    let events = await queryEventData();
+    let _events = await queryEventData();
 
-    while (event_counter <= events.length) {
+    while (_event_counter <= _events.length) {
       // step 0: delete all existing commitruleml files
       fs.readdir("test/commitruleml/run/", (err, files) => {
         if (err) console.log(err);
@@ -172,7 +173,7 @@ contract("CBSC Simulation", async (accounts) => {
       });
 
       // step 1: read the actions from the CBSC app
-      let action = await queryActionData(db_action_counter);
+      let _action = await queryActionData(_db_action_counter);
 
       // step 2: write the actions to commitml files
       let ruleMLTemplate = fs.readFileSync(
@@ -185,203 +186,275 @@ contract("CBSC Simulation", async (accounts) => {
       });
 
       //on template attributes matching
-      templateJson.Rule.Assert.on.Happens.Event.id = action.events.id;
-      templateJson.Rule.Assert.on.Happens.Event.id = action.events.title;
+      templateJson.Rule.Assert.on.Happens.Event.id = _action.events.id;
+      templateJson.Rule.Assert.on.Happens.Event.id = _action.events.title;
       //templateJson.Rule.Assert.on.Happens.Event.slot.title = ;
       //templateJson.Rule.Assert.on.Happens.Event.slot.ind.value = ;
-      templateJson.Rule.Assert.on.Happens.Time.event = event_counter;
-      templateJson.Rule.Assert.on.Happens.Time.event = code_action_counter;
-      templateJson.Rule.Assert.on.Happens.Time.event = iteration;
+      templateJson.Rule.Assert.on.Happens.Time.event = _event_counter;
+      templateJson.Rule.Assert.on.Happens.Time.event = _code_action_counter;
+      templateJson.Rule.Assert.on.Happens.Time.event = _iteration;
+
+      let start = _action.commitments.fluents[0].start.split(".");
+      let end = _action.commitments.fluents[0].end.split(".");
 
       //if template attributes matching
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.id = action.commitments.id;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.type = action.commitments.type;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.title = action.commitments.title;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.role = action.commitments.role;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.state = action.commitments.state;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.id =
+        _action.commitments.id;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.type =
+        _action.commitments.type;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.title =
+        _action.commitments.title;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.role =
+        _action.commitments.role;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.state =
+        _action.commitments.state;
       templateJson.Rule.Assert.if.HoldsAt.Commitment.Agent.address = x;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Agent.type = action.commitments.debtor;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Agent.type =
+        _action.commitments.debtor;
       templateJson.Rule.Assert.if.HoldsAt.Commitment.Agent.address = y;
       templateJson.Rule.Assert.if.HoldsAt.Commitment.Agent.type = y;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.id = action.commitments.fluents.id;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.type = action.commitments.fluents.type;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.title = action.commitments.fluents.title;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.value = action.commitments.fluents.title;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.balance = action.commitments.fluents.balance;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.original_balance = action.commitments.fluents.original_balance;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent,atomic = action.commitments.fluents.atomic;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.terms = action.commitments.fluents.terms;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.terms_left = action.commitments.fluents.terms_left;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.Start.event = action.commitments.fluents.start.event;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.Start.action = action.commitments.fluents.start.action;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.Start.iteration = action.commitments.fluents.start.iteration;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.End.event = ;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.End.action = ;
-      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.End.iteration = ;
-      templateJson.Rule.Assert.if.Action.id = action.id;
-      templateJson.Rule.Assert.if.Action.type = action.type;
-      templateJson.Rule.Assert.if.Action.message = action.message;
-      templateJson.Rule.Assert.if.Action.Commitment.id = action.commitments.id;
-      templateJson.Rule.Assert.if.Action.Commitment.type = action.commitments.type;
-      templateJson.Rule.Assert.if.Action.Commitment.title = action.commitments.title;
-      templateJson.Rule.Assert.if.Action.Commitment.role = action.commitments.role;
-      templateJson.Rule.Assert.if.Action.Commitment.state = action.commitments.state;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.id =
+        _action.commitments.fluents[0].id;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.type =
+        _action.commitments.fluents[0].type;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.title =
+        _action.commitments.fluents[0].title;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.value =
+        _action.commitments.fluents[0].title;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.balance =
+        _action.commitments.fluents[0].balance;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.original_balance =
+        _action.commitments.fluents[0].original_balance;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent,
+        (atomic = _action.commitments.fluents[0].atomic);
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.terms =
+        _action.commitments.fluents[0].terms;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.terms_left =
+        _action.commitments.fluents[0].terms_left;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.Start.event =
+        _action.commitments.fluents[0].start.event;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.Start.action =
+        _action.commitments.fluents[0].start.action;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.Start.iteration =
+        _action.commitments.fluents[0].start.iteration;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.End.event =
+        _action.commitments.fluents[0].end.event;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.End.action =
+        _action.commitments.fluents[0].end.action;
+      templateJson.Rule.Assert.if.HoldsAt.Commitment.Fluent.End.iteration =
+        _action.commitments.fluents[0].end.iteration;
+      templateJson.Rule.Assert.if.Action.id = _action.id;
+      templateJson.Rule.Assert.if.Action.operation = _action.operation;
+      templateJson.Rule.Assert.if.Action.transition = _action.transition;
+      templateJson.Rule.Assert.if.Action.message = _action.message;
+      templateJson.Rule.Assert.if.Action.Commitment.id = _action.commitments.id;
+      templateJson.Rule.Assert.if.Action.Commitment.type =
+        _action.commitments.type;
+      templateJson.Rule.Assert.if.Action.Commitment.title =
+        _action.commitments.title;
+      templateJson.Rule.Assert.if.Action.Commitment.role =
+        _action.commitments.role;
+      templateJson.Rule.Assert.if.Action.Commitment.state =
+        _action.commitments.state;
       templateJson.Rule.Assert.if.Action.Commitment.Agent.address = x;
-      templateJson.Rule.Assert.if.Action.Commitment.Agent.type = action.commitments.debtor;
+      templateJson.Rule.Assert.if.Action.Commitment.Agent.type =
+        _action.commitments.debtor;
       templateJson.Rule.Assert.if.Action.Commitment.Agent.address = y;
-      templateJson.Rule.Assert.if.Action.Commitment.Agent.type = action.commitments.creditor;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.id = action.commitments.fluents.id;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.type = action.commitments.fluents.type;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.title = action.commitments.fluents.title;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.value = action.commitments.fluents.value;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.balance = action.commitments.fluents.balance;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.original_balance = action.commitments.fluents.original_balance;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.atomic = action.commitments.fluents.atomic;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.terms = action.commitments.fluents.terms;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.terms_left = action.commitments.fluents.terms_left;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.Start.event = action.commitments.fluents.start.event;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.Start.action = action.commitments.fluents.start.action;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.Start.iteration = action.commitments.fluents.start.iteration;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.End.event = action.commitments.fluents.end.event;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.End.action = action.commitments.fluents.end.action;
-      templateJson.Rule.Assert.if.Action.Commitment.Fluent.End.iteration = action.commitments.fluents.end.iteration;
-      
-      //on template attributes matching
-      templateJson.Rule.Assert.do.Action.id = action.id;
-      templateJson.Rule.Assert.do.Action.type = action.type;
-      templateJson.Rule.Assert.do.Action.message = action.message;
-      templateJson.Rule.Assert.do.Action.Commitment.id = action.commitments.id;
-      templateJson.Rule.Assert.do.Action.Commitment.type = action.commitments.type;
-      templateJson.Rule.Assert.do.Action.Commitment.title = action.commitments.title;
-      templateJson.Rule.Assert.do.Action.Commitment.role = action.commitments.role;
-      templateJson.Rule.Assert.do.Action.Commitment.state = action.commitments.state;
-      templateJson.Rule.Assert.do.Action.Commitment.Agent.address = action.commitments.debtor;
-      templateJson.Rule.Assert.do.Action.Commitment.Agent.type = x;
-      templateJson.Rule.Assert.do.Action.Commitment.Agent.address = action.commitments.creditor;
-      templateJson.Rule.Assert.do.Action.Commitment.Agent.type = y;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.id = action.commitments.fluents.id;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.type = action.commitments.fluents.type;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.title = action.commitments.fluents.title;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.value = action.commitments.fluents.value;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.balance = action.commitments.fluents.balance;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.original_balance = action.commitments.fluents.original_balance;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.atomic = action.commitments.fluents.atomic;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.terms = action.commitments.fluents.terms;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.terms_left = action.commitments.fluents.terms_left;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.Start.event =action.commitments.fluents.start.event;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.Start.action = action.commitments.fluents.start.action;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.Start.iteration = action.commitments.fluents.start.iteration;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.End.event = action.commitments.fluents.end.event;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.End.action = action.commitments.fluents.end.action;
-      templateJson.Rule.Assert.do.Action.Commitment.Fluent.End.iteration = action.commitments.fluents.end.iteration;
+      templateJson.Rule.Assert.if.Action.Commitment.Agent.type =
+        _action.commitments.creditor;
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.id =
+        _action.commitments.fluents[0].id;
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.type =
+        _action.commitments.fluents[0].type;
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.title =
+        _action.commitments.fluents[0].title;
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.value =
+        _action.commitments.fluents[0].value;
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.balance =
+        _action.commitments.fluents[0].balance;
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.original_balance =
+        _action.commitments.fluents[0].original_balance;
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.atomic =
+        _action.commitments.fluents[0].atomic;
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.terms =
+        _action.commitments.fluents[0].terms;
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.terms_left =
+        _action.commitments.fluents[0].terms_left;
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.Start.event =
+        start[0];
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.Start.action =
+        start[1];
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.Start.iteration =
+        start[2];
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.End.event = end[0];
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.End.action = end[1];
+      templateJson.Rule.Assert.if.Action.Commitment.Fluent.End.iteration =
+        end[2];
 
-      let time = event_counter + "." + code_action_counter + "." + _attempt;
+      //on template attributes matching
+      templateJson.Rule.Assert.do.Action.id = _action.id;
+      templateJson.Rule.Assert.do.Action.operation = _action.operation;
+      templateJson.Rule.Assert.do.Action.transition = _action.transition;
+      templateJson.Rule.Assert.do.Action.message = _action.message;
+      templateJson.Rule.Assert.do.Action.Commitment.id = _action.commitments.id;
+      templateJson.Rule.Assert.do.Action.Commitment.type =
+        _action.commitments.type;
+      templateJson.Rule.Assert.do.Action.Commitment.title =
+        _action.commitments.title;
+      templateJson.Rule.Assert.do.Action.Commitment.role =
+        _action.commitments.role;
+      templateJson.Rule.Assert.do.Action.Commitment.state =
+        _action.commitments.state;
+      templateJson.Rule.Assert.do.Action.Commitment.Agent.address =
+        _action.commitments.debtor;
+      templateJson.Rule.Assert.do.Action.Commitment.Agent.type = x;
+      templateJson.Rule.Assert.do.Action.Commitment.Agent.address =
+        _action.commitments.creditor;
+      templateJson.Rule.Assert.do.Action.Commitment.Agent.type = y;
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.id =
+        _action.commitments.fluents[0].id;
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.type =
+        _action.commitments.fluents[0].type;
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.title =
+        _action.commitments.fluents[0].title;
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.value =
+        _action.commitments.fluents[0].value;
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.balance =
+        _action.commitments.fluents[0].balance;
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.original_balance =
+        _action.commitments.fluents[0].original_balance;
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.atomic =
+        _action.commitments.fluents[0].atomic;
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.terms =
+        _action.commitments.fluents[0].terms;
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.terms_left =
+        _action.commitments.fluents[0].terms_left;
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.Start.event =
+        start[0];
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.Start.action =
+        start[1];
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.Start.iteration =
+        start[2];
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.End.event = end[0];
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.End.action = end[1];
+      templateJson.Rule.Assert.do.Action.Commitment.Fluent.End.iteration =
+        end[2];
+
+      let time = _event_counter + "." + _code_action_counter + "." + _iteration;
       await writeRuleMLOutput(time, templateJson);
 
-      console.log(action);
-      console.log(templateJson.Rule.Assert.on.Happens.Event);
+      // BUILD A DELAY FUNCTION TO READ THE RULE
+      // let ruleMLTemplateOnRun = fs.readFileSync(
+      //   "test/commitruleml/run/run-" + time + ".commitruleml",
+      //   "utf8"
+      // );
+      // let rule = xmlParser.toJson(ruleMLTemplateOnRun, {
+      //   reversible: true,
+      //   object: true,
+      // });
 
-      if (action == null) {
-        console.log("Action finished");
-        event_counter++;
-      } else {
-        /* manipulate commitment ton the on-chain ledger */
-        switch (action.state) {
-          case "committed":
-            await instance.commit(
-              action.commitments.id,
-              buyer,
-              seller,
-              action.commitments.fluents[0].id,
-              action.commitments.fluents[0].balance,
-              action.commitments.fluents[0].atomic
-            );
+      // console.log(time);
+      // console.log(rule);
 
-            assert.equal("committed", state, "Saving state failed");
+      switch (_action.transition) {
+        case "committed":
+          await instance.commit(
+            action.commitments.id,
+            buyer,
+            seller,
+            action.commitments.fluents[0].id,
+            action.commitments.fluents[0].balance,
+            action.commitments.fluents[0].atomic
+          );
 
-            break;
-          case "activated":
-            await instance.activate(action.commitments.id, buyer);
+          assert.equal("committed", state, "Saving state failed");
 
-            assert.equal("activated", state, "Saving state failed");
+          break;
+        case "activated":
+          await instance.activate(action.commitments.id, buyer);
 
-            break;
-          case "satisfied":
-            await instance.satisfy(
-              action.commitments.fluents[0].id,
-              action.commitments.id,
-              action.fulfillment_value
-            );
+          assert.equal("activated", state, "Saving state failed");
 
-            assert.equal("satisfied", state, "Saving state failed");
+          break;
+        case "satisfied":
+          await instance.satisfy(
+            action.commitments.fluents[0].id,
+            action.commitments.id,
+            action.fulfillment_value
+          );
 
-            // if (balance != undefined) {
+          assert.equal("satisfied", state, "Saving state failed");
 
-            //     origin = "A";
-            //     faction = 1;
+          // if (balance != undefined) {
 
-            //     await updateFluentBalance(iteration.fluents.id, iteration.fluents.balance, balance, faction);
+          //     origin = "A";
+          //     faction = 1;
 
-            //     await insertPartialFulfillment((iteration_counter + 1), iteration.events.id, iteration.iteration, iteration.fluents.id, iteration.attempt++, iteration.action, origin);
-            // }
-            // else {
-            //     assert.equal(
-            //         'satisfied',
-            //         state,
-            //         "Saving state failed"
-            //     );
-            // }
-            break;
-          case "cancel":
-            await instance.cancel(
-              iteration.fluents.id,
-              iteration.fluents.commitments.id,
-              iteration.fluents.value
-            );
+          //     await updateFluentBalance(iteration.fluents.id, iteration.fluents.balance, balance, faction);
 
-            break;
-          case "assign":
-            await instance.release(
-              iteration.fluents.id,
-              iteration.fluents.commitments.id,
-              iteration.fluents.value
-            );
+          //     await insertPartialFulfillment((iteration_counter + 1), iteration.events.id, iteration.iteration, iteration.fluents.id, iteration.attempt++, iteration.action, origin);
+          // }
+          // else {
+          //     assert.equal(
+          //         'satisfied',
+          //         state,
+          //         "Saving state failed"
+          //     );
+          // }
+          break;
+        case "cancel":
+          await instance.cancel(
+            iteration.fluents.id,
+            iteration.fluents.commitments.id,
+            iteration.fluents.value
+          );
 
-            break;
-          default:
-        }
+          break;
+        case "assign":
+          await instance.release(
+            iteration.fluents.id,
+            iteration.fluents.commitments.id,
+            iteration.fluents.value
+          );
 
-        /* set the time */
-        //let time = event_counter + "." + code_action_counter + "." + _attempt;
-
-        /* insert hash and timestamp to action */
-        let insertHash = await insertHash(db_action_counter, hash);
-
-        /* update the RuleMl template */
-        let ruleMLTemplate = fs.readFileSync(
-          "test/ruleml/template.ruleml",
-          "utf8"
-        );
-        templateJson = xmlParser.toJson(ruleMLTemplate, {
-          reversible: true,
-          object: true,
-        });
-
-        /* insert data into the RuleMl template */
-        templateJson.Rule.on.Happens.Event.id = action.events.id;
-        templateJson.Rule.on.Happens.Event.id = action.events.title;
-
-        await writeRuleMLOutput(time, templateJson);
-
-        /* Comparing blockchain hash to cloud hash */
-        assert.equal(insertHash, hash, "Saving state failed");
-      }
-      if (event_counter > events.length) {
-        console.log("Protocol run completed");
+          break;
+        default:
       }
 
-      db_action_counter++;
-      code_action_counter;
+      /* manipulate commitment ton the on-chain ledger */
+
+      console.log(hash);
+
+      /* set the time */
+      //let time = event_counter + "." + code_action_counter + "." + _attempt;
+
+      /* insert hash and timestamp to action */
+      // let insertHash = await insertHash(db_action_counter, hash);
+
+      // /* update the RuleMl template */
+      // let ruleMLTemplate = fs.readFileSync(
+      //   "test/ruleml/template.ruleml",
+      //   "utf8"
+      // );
+      // templateJson = xmlParser.toJson(ruleMLTemplate, {
+      //   reversible: true,
+      //   object: true,
+      // });
+
+      // /* insert data into the RuleMl template */
+      // templateJson.Rule.on.Happens.Event.id = action.events.id;
+      // templateJson.Rule.on.Happens.Event.id = action.events.title;
+
+      // await writeRuleMLOutput(time, templateJson);
+
+      /* Comparing blockchain hash to cloud hash */
+      //assert.equal(insertHash, hash, "Saving state failed");
     }
+    if (_event_counter > events.length) {
+      console.log("Protocol run completed");
+    }
+
+    _db_action_counter++;
+    _code_action_counter;
   });
 });

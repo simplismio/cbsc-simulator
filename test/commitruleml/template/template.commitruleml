@@ -21,7 +21,7 @@
                     </Fluent>
                 </Commitment>
             </HoldsAt>
-            <Action id="" type="" message="">
+            <Action id="" operation="" transition="" message="">
                 <Commitment id="" type="" title="" role="" state="">
                     <Agent address="" type=""></Agent>
                     <Agent address="" type=""></Agent>
@@ -33,7 +33,7 @@
             </Action>
         </if>
         <do>
-            <Action id="" type="" message="">
+            <Action id="" operation="" transition="" message="">
                 <Commitment id="2" type="" title="" role="" state="">
                     <Agent address="13" type=""></Agent>
                     <Agent address="13" type=""></Agent>
