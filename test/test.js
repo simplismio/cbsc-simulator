@@ -15,8 +15,8 @@ contract("CBSC Simulation", async (accounts) => {
   let y = accounts[2];
   let xz = accounts[3];
   let yz = accounts[4];
-  let buyer = x; //xz
-  let seller = y; //yz
+  let debtor = x; //xz
+  let creditor = y; //yz
 
   /*
    * Instance to connect to smart contract via Ganache-CLI
@@ -76,7 +76,9 @@ contract("CBSC Simulation", async (accounts) => {
         } else {
           console.log();
           console.log(
-            "  RuleML template file run-" + time + ".ruleml generated"
+            "  CommitRuleML template file run-" +
+              time +
+              ".commitruleml generated"
           );
           console.log();
         }
@@ -84,12 +86,7 @@ contract("CBSC Simulation", async (accounts) => {
     );
   }
 
-  async function createCommitRuleMLFile(
-    _action,
-    _event_counter,
-    _code_action_counter,
-    _iteration
-  ) {
+  async function createCommitRuleMLFile(_action, _time) {
     let ruleMLTemplate = fs.readFileSync(
       "test/commitruleml/template/template.commitruleml",
       "utf8"
@@ -104,9 +101,7 @@ contract("CBSC Simulation", async (accounts) => {
     templateJson.Rule.Assert.on.Happens.Event.id = _action.events.title;
     //templateJson.Rule.Assert.on.Happens.Event.slot.title = ;
     //templateJson.Rule.Assert.on.Happens.Event.slot.ind.value = ;
-    templateJson.Rule.Assert.on.Happens.Time.event = _event_counter;
-    templateJson.Rule.Assert.on.Happens.Time.event = _code_action_counter;
-    templateJson.Rule.Assert.on.Happens.Time.event = _iteration;
+    templateJson.Rule.Assert.on.Happens.Time.value = _time;
 
     let start = _action.commitments.fluents[0].start.split(".");
     let end = _action.commitments.fluents[0].end.split(".");
@@ -249,9 +244,98 @@ contract("CBSC Simulation", async (accounts) => {
     templateJson.Rule.Assert.do.Action.Commitment.Fluent.End.action = end[1];
     templateJson.Rule.Assert.do.Action.Commitment.Fluent.End.iteration = end[2];
 
-    let time = _event_counter + "." + _code_action_counter + "." + _iteration;
-    await writeRuleMLOutput(time, templateJson);
+    await writeRuleMLOutput(_time, templateJson);
   }
+
+  async function removeAllCommitRuleMlFiles() {
+    fs.readdir("test/commitruleml/run/", (err, files) => {
+      if (err) console.log(err);
+      for (const file of files) {
+        fs.unlinkSync("test/commitruleml/run/" + file);
+      }
+    });
+  }
+
+  async function commit(_actionNumber, _debtor, _creditor, _time) {
+    // step 1: read the actions from the CBSC.app
+    let _action = await queryActionData(_actionNumber);
+
+    // step 2: create the CommitRuleMl file from the template
+    await createCommitRuleMLFile(_action, _time);
+
+    // step 3:
+    await instance.commit(
+      _action.commitments.id,
+      _action.operation,
+      _debtor,
+      _creditor,
+      _action.commitments.fluents[0].id,
+      _action.commitments.fluents[0].balance,
+      _action.commitments.fluents[0].atomic,
+      _action.commitments.fluents[0].start,
+      _action.commitments.fluents[0].end
+    );
+
+    templateJson.Rule.signature = hash;
+    assert.equal(_action.transition, state, "Saving commit state failed");
+    assert.equal(templateJson.Rule.signature, hash, "Saving signature failed");
+  }
+
+  async function activate(_actionNumber, _debtor, _creditor, _time, _log) {
+    // step 1: read the actions from the CBSC.app
+    let _action = await queryActionData(_actionNumber);
+
+    // step 2: create the CommitRuleMl file from the template
+    await createCommitRuleMLFile(_action, _time);
+
+    // step 3:
+    await instance.activate(
+      _action.commitments.id,
+      _action.operation,
+      _debtor,
+      _creditor,
+      _action.commitments.fluents[0].id,
+      _action.commitments.fluents[0].balance,
+      _action.commitments.fluents[0].atomic,
+      _action.commitments.fluents[0].start,
+      _action.commitments.fluents[0].end
+    );
+
+    if (_log == 1) {
+      templateJson.Rule.signature = hash;
+      assert.equal(_action.transition, state, "Saving activate state failed");
+      assert.equal(
+        templateJson.Rule.signature,
+        hash,
+        "Saving signature failed"
+      );
+    }
+  }
+
+  async function satisfy(_actionNumber, _time) {
+    // step 1: read the actions from the CBSC.app
+    let _action = await queryActionData(_actionNumber);
+
+    // step 2: create the CommitRuleMl file from the template
+    await createCommitRuleMLFile(_action, _time);
+
+    // step 3:
+    await instance.satisfy(
+      _action.commitments.fluents[0].id,
+      _action.commitments.id,
+      _action.fulfillment_value,
+      _action.operation,
+      _time
+    );
+
+    templateJson.Rule.signature = hash;
+    assert.equal(_action.transition, state, "Saving satisfy state failed");
+    assert.equal(templateJson.Rule.signature, hash, "Saving signature failed");
+  }
+
+  async function delegate() {}
+
+  async function assign() {}
 
   before("Preparing CBSC", async () => {
     instance = await CBSC.deployed();
@@ -260,9 +344,9 @@ contract("CBSC Simulation", async (accounts) => {
      * Setup roles for test, defaults to x & y
      * Optional functions to delegate or assign
      */
-    await instance.setupRoles(buyer, seller);
-    //await instance.grantbuyerRole(xz);
-    //await instance.grantsellerRole(xy);
+    await instance.setupRoles(debtor, creditor);
+    //await instance.grantdebtorRole(xz);
+    //await instance.grantcreditorRole(xy);
 
     instance.StateLog({}, async (error, result) => {
       if (error) {
@@ -271,6 +355,10 @@ contract("CBSC Simulation", async (accounts) => {
       if (result) {
         hash = result.transactionHash;
         state = result.args.state;
+        console.log("  Signature is: " + result.transactionHash);
+        console.log("  State is: " + result.args.state);
+
+        console.log();
       }
     });
 
@@ -285,141 +373,113 @@ contract("CBSC Simulation", async (accounts) => {
     });
   });
 
-  it("CBSC Protocol Run", async () => {
-    let _event_counter = 1;
-    let _db_action_counter = await getActionCounter();
-    let _code_action_counter = 1;
-    let _iteration = 0;
+  // it("CBSC Protocol Run", async () => {
+  //   let _event_counter = 1;
+  //   let _db_action_counter = await getActionCounter();
+  //   let _code_action_counter = 1;
+  //   let _iteration = 0;
 
-    let _events = await queryEventData();
+  //   let _events = await queryEventData();
 
-    while (_event_counter <= _events.length) {
-      // step 0: delete all existing commitruleml files
-      fs.readdir("test/commitruleml/run/", (err, files) => {
-        if (err) console.log(err);
-        for (const file of files) {
-          fs.unlinkSync("test/commitruleml/run/" + file);
-        }
-      });
+  //   //while (_event_counter <= _events.length) {
+  //   // step 0: delete all existing commitruleml files
+  //   fs.readdir("test/commitruleml/run/", (err, files) => {
+  //     if (err) console.log(err);
+  //     for (const file of files) {
+  //       fs.unlinkSync("test/commitruleml/run/" + file);
+  //     }
+  //   });
 
-      // Read the actions from the CBSC app
-      let _action = await queryActionData(_db_action_counter);
+  //   // Read the actions from the CBSC app
+  //   let _action = await queryActionData(_db_action_counter);
 
-      // Create the CommitRuleMl file from the template
-      await createCommitRuleMLFile(
-        _action,
-        _event_counter,
-        _code_action_counter,
-        _iteration
-      );
+  //   // Create the CommitRuleMl file from the template
+  //   await createCommitRuleMLFile(
+  //     _action,
+  //     _event_counter,
+  //     _code_action_counter,
+  //     _iteration
+  //   );
 
-      // BUILD A DELAY FUNCTION TO READ THE RULE
-      // let ruleMLTemplateOnRun = fs.readFileSync(
-      //   "test/commitruleml/run/run-" + time + ".commitruleml",
-      //   "utf8"
-      // );
-      // let rule = xmlParser.toJson(ruleMLTemplateOnRun, {
-      //   reversible: true,
-      //   object: true,
-      // });
+  //   let _time = 100;
 
-      // Switch case loop to manipulate the smart contract
-      switch (_action.transition) {
-        case "committed":
-          await instance.commit(
-            _action.commitments.id,
-            buyer,
-            seller,
-            _action.commitments.fluents[0].id,
-            _action.commitments.fluents[0].balance,
-            _action.commitments.fluents[0].atomic
-          );
-          break;
-        case "activated":
-          await instance.activate(action.commitments.id, buyer);
+  //   // Switch case loop to manipulate the smart contract
+  //   switch (_action.transition) {
+  //     case "commit":
+  // await instance.commit(
+  //   _action.commitments.id,
+  //   _action.operation,
+  //   debtor,
+  //   creditor,
+  //   _action.commitments.fluents[0].id,
+  //   _action.commitments.fluents[0].balance,
+  //   _action.commitments.fluents[0].atomic,
+  //   _action.commitments.fluents[0].start,
+  //   _action.commitments.fluents[0].end
+  // );
+  //       break;
+  //     case "activate":
+  // await instance.activate(
+  //   _action.commitments.id,
+  //   _action.operation,
+  //   debtor,
+  //   creditor,
+  //   _action.commitments.fluents[0].id,
+  //   _action.commitments.fluents[0].balance,
+  //   _action.commitments.fluents[0].atomic,
+  //   _action.commitments.fluents[0].start,
+  //   _action.commitments.fluents[0].end
+  // );
+  //       break;
+  //     case "satisfy":
+  //       await instance.satisfy(
+  //         //_action.commitments.fluents[0].id,
+  //         _action.commitments.id,
+  //         _action.fulfillment_value,
+  //         _action.operation,
+  //         _time,
+  //         _action.commitments.fluents[0].start,
+  //         _action.commitments.fluents[0].end
+  //       );
+  //       break;
+  //     default:
+  //   }
 
-          assert.equal("activated", state, "Saving state failed");
+  //   templateJson.Rule.signature = hash;
+  //   assert.equal(_action.transition, state, "Saving state failed");
+  //   assert.equal(templateJson.Rule.signature, hash, "Saving signature failed");
 
-          break;
-        case "satisfied":
-          await instance.satisfy(
-            action.commitments.fluents[0].id,
-            action.commitments.id,
-            action.fulfillment_value
-          );
+  //   if (_event_counter > _events.length) {
+  //     console.log("Protocol run completed");
+  //   }
 
-          assert.equal("satisfied", state, "Saving state failed");
+  //   _db_action_counter++;
+  //   _code_action_counter++;
+  //   //}
+  // });
 
-          // if (balance != undefined) {
+  let _test = 3;
+  let _time = 100;
 
-          //     origin = "A";
-          //     faction = 1;
+  if (_test == 1) {
+    it("Test 1: Commit a commitment", async () => {
+      await removeAllCommitRuleMlFiles();
+      await commit(9, debtor, creditor, 110);
+    });
+  }
 
-          //     await updateFluentBalance(iteration.fluents.id, iteration.fluents.balance, balance, faction);
+  if (_test == 2) {
+    it("Test 2: Activate a commitment", async () => {
+      await removeAllCommitRuleMlFiles();
+      await activate(9, debtor, creditor, 110);
+    });
+  }
 
-          //     await insertPartialFulfillment((iteration_counter + 1), iteration.events.id, iteration.iteration, iteration.fluents.id, iteration.attempt++, iteration.action, origin);
-          // }
-          // else {
-          //     assert.equal(
-          //         'satisfied',
-          //         state,
-          //         "Saving state failed"
-          //     );
-          // }
-          break;
-        case "cancel":
-          await instance.cancel(
-            iteration.fluents.id,
-            iteration.fluents.commitments.id,
-            iteration.fluents.value
-          );
-
-          break;
-        case "assign":
-          await instance.release(
-            iteration.fluents.id,
-            iteration.fluents.commitments.id,
-            iteration.fluents.value
-          );
-
-          break;
-        default:
-      }
-
-      templateJson.Rule.signature = hash;
-
-      assert.equal(_action.transition, state, "Saving state failed");
-      assert.equal(
-        templateJson.Rule.signature,
-        hash,
-        "Saving signature failed"
-      );
-
-      /* manipulate commitment ton the on-chain ledger */
-
-      // /* update the RuleMl template */
-      // let ruleMLTemplate = fs.readFileSync(
-      //   "test/ruleml/template.ruleml",
-      //   "utf8"
-      // );
-      // templateJson = xmlParser.toJson(ruleMLTemplate, {
-      //   reversible: true,
-      //   object: true,
-      // });
-
-      // /* insert data into the RuleMl template */
-      // templateJson.Rule.on.Happens.Event.id = action.events.id;
-      // templateJson.Rule.on.Happens.Event.id = action.events.title;
-
-      // await writeRuleMLOutput(time, templateJson);
-
-      /* Comparing blockchain hash to cloud hash */
-    }
-    if (_event_counter > events.length) {
-      console.log("Protocol run completed");
-    }
-
-    _db_action_counter++;
-    _code_action_counter;
-  });
+  if (_test == 3) {
+    it("Test 3: Satisfy a commitment", async () => {
+      await removeAllCommitRuleMlFiles();
+      await activate(9, debtor, creditor, 110, 0);
+      await satisfy(10, 120);
+    });
+  }
 });

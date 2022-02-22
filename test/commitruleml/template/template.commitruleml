@@ -7,7 +7,7 @@
                         <Ind value="" />
                     </slot>
                 </Event>
-                <Time event="" action="" iteration=""></Time>
+                <Time value=""></Time>
             </Happens>
         </on>
         <if>

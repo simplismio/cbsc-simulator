@@ -1,0 +1,53 @@
+<Rule signature="">
+    <Assert>
+        <on>
+            <Happens>
+                <Event id="TestEvent" title="">
+                    <slot title="">
+                        <Ind value=""></Ind>
+                    </slot>
+                </Event>
+                <Time value="110"></Time>
+            </Happens>
+        </on>
+        <if>
+            <HoldsAt>
+                <Commitment id="69" title="open a position" state="committed">
+                    <Agent address="" type=""></Agent>
+                    <Agent address="" type=""></Agent>
+                    <Fluent id="13" title="post job" value="post job" balance="3" atomic="" terms_left="2">
+                        <original_balance></original_balance>
+                        <Start></Start>
+                        <End></End>
+                    </Fluent>
+                </Commitment>
+            </HoldsAt>
+            <Action operation="confirm" transition="activate">
+                <message></message>
+                <Commitment id="69" title="open a position" state="committed">
+                    <Agent address="" type=""></Agent>
+                    <Agent address="" type=""></Agent>
+                    <Fluent id="13" title="post job" balance="3" atomic="false" terms_left="2">
+                        <original_balance></original_balance>
+                        <Start event="100"></Start>
+                        <End event="100"></End>
+                    </Fluent>
+                </Commitment>
+            </Action>
+        </if>
+        <do>
+            <Action operation="confirm" transition="activate">
+                <message></message>
+                <Commitment id="69" title="open a position" state="committed">
+                    <Agent address="13" type=""></Agent>
+                    <Agent address="13" type=""></Agent>
+                    <Fluent id="13" title="post job" balance="3" atomic="false" terms_left="2">
+                        <original_balance></original_balance>
+                        <Start event="100"></Start>
+                        <End event="100"></End>
+                    </Fluent>
+                </Commitment>
+            </Action>
+        </do>
+    </Assert>
+</Rule>
