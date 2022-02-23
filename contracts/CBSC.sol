@@ -44,15 +44,29 @@ contract CBSC is Ownable, AccessControl {
     /*
      * Grant debtor role to xz
      */
-    function grantdebtorRole(address debtor) external {
+    function grantDebtorRole(address debtor) external {
         grantRole(debtor_ROLE, debtor);
     }
 
     /*
      * Grant creditor role to xy
      */
-    function grantcreditorRole(address creditor) external {
+    function grantCreditorRole(address creditor) external {
         grantRole(creditor_ROLE, creditor);
+    }
+
+    /*
+     * Revoke debtor role
+     */
+    function revokeDebtorRole(address debtor) external {
+        revokeRole(debtor_ROLE, debtor);
+    }
+
+    /*
+     * Revoke creditor role
+     */
+    function revokeCreditorRole(address creditor) external {
+        revokeRole(creditor_ROLE, creditor);
     }
 
     /*
@@ -101,7 +115,7 @@ contract CBSC is Ownable, AccessControl {
     //   */
     modifier partialFulfilmentIsAllowed(uint256 _fluent_id) {
         require(
-            fluents[_fluent_id].atomic == true,
+            fluents[_fluent_id].atomic == false,
             "Modifier partialFulfilmentIsAllowed failed"
         );
         _;
@@ -150,7 +164,7 @@ contract CBSC is Ownable, AccessControl {
         require(
             keccak256(abi.encodePacked(_operation)) ==
                 keccak256(abi.encodePacked("delegate")),
-            "Modifier operationIsConsidered failed"
+            "Modifier operationIsDelegate failed"
         );
         _;
     }
@@ -162,7 +176,7 @@ contract CBSC is Ownable, AccessControl {
         require(
             keccak256(abi.encodePacked(_operation)) ==
                 keccak256(abi.encodePacked("assign")),
-            "Modifier operationIsConsidered failed"
+            "Modifier operationIsAssign failed"
         );
         _;
     }
@@ -171,7 +185,11 @@ contract CBSC is Ownable, AccessControl {
      * Modifier to verify that a the operation is Assigned
      */
     modifier fulfillmentIsNotEarly(uint256 _start, uint256 _time) {
-        require(_time <= _start, "Modifier fulfillmentIsNotEarly failed");
+        require(
+            keccak256(abi.encodePacked(_time)) >=
+                keccak256(abi.encodePacked(_start)),
+            "Modifier fulfillmentIsNotEarly failed"
+        );
         _;
     }
 
@@ -179,15 +197,11 @@ contract CBSC is Ownable, AccessControl {
      * Modifier to verify that a the operation is Assigned
      */
     modifier fulfillmentIsNotLate(uint256 _end, uint256 _time) {
-        require(_time >= _end, "Modifier fulfillmentIsNotLate failed");
-        _;
-    }
-
-    /*
-     * Modifier to verify that a the operation is Assigned
-     */
-    modifier fulfillmentIsNotZero(uint256 _fulfillment_value) {
-        require(_fulfillment_value > 0, "Modifier fulfillmentIsNotZero failed");
+        require(
+            keccak256(abi.encodePacked(_time)) <=
+                keccak256(abi.encodePacked(_end)),
+            "Modifier fulfillmentIsNotLate failed"
+        );
         _;
     }
 
@@ -238,42 +252,44 @@ contract CBSC is Ownable, AccessControl {
     function satisfy(
         uint256 _fluent_id,
         uint256 _commitment_id,
+        string memory _operation,
+        uint256 _time
+    )
+        external
+        commitmentIsActivated(_commitment_id)
+        operationIsFulfill(_operation)
+        fulfillmentIsNotEarly(fluents[_fluent_id].start, _time)
+        fulfillmentIsNotLate(fluents[_fluent_id].end, _time)
+    {
+        commitments[_commitment_id].state = "satisfy";
+        emit StateLog(_commitment_id, commitments[_commitment_id].state);
+    }
+
+    function partialSatisfy(
+        uint256 _fluent_id,
+        uint256 _commitment_id,
         uint256 _value,
         string memory _operation,
         uint256 _time
     )
         external
+        commitmentIsActivated(_commitment_id)
         operationIsFulfill(_operation)
         fulfillmentIsNotEarly(fluents[_fluent_id].start, _time)
         fulfillmentIsNotLate(fluents[_fluent_id].end, _time)
-        fulfillmentIsNotZero(_value)
+        partialFulfilmentIsAllowed(_fluent_id)
     {
-        commitments[_commitment_id].state = "satisfy";
+        fluents[_fluent_id].balance = fluents[_fluent_id].balance - _value;
         emit StateLog(_commitment_id, commitments[_commitment_id].state);
-
-        // if (fluents[_fluent_id].balance == _value) {
-        //     commitments[_commitment_id].state = "satisfy";
-        //     emit StateLog(_commitment_id, commitments[_commitment_id].state);
-        // } else {
-        //     //partiallySatisfy(_fluent_id, _value);
-        // }
     }
 
-    //        commitmentIsActivated(_commitment_id)
-
-    // function partiallySatisfy(uint256 _fluent_id, uint256 _value)
-    //     internal
-    //     partialFulfilmentIsAllowed(_fluent_id)
-    // {
-    //     fluents[_fluent_id].value = fluents[_fluent_id].balance - _value;
-    //     commitments[fluents[_fluent_id].commitment_id]
-    //         .state = "partially satisfied";
-
-    //     emit PartialSatisfactionLog(fluents[_fluent_id].balance);
-    // }
-
-    function cancel(uint256 _commitment_id, string memory _operation)
+    function cancel(
+        address _debtor,
+        uint256 _commitment_id,
+        string memory _operation
+    )
         external
+        onlyDebtor(_debtor)
         commitmentIsCommitted(_commitment_id)
         operationIsDelegate(_operation)
     {
@@ -281,8 +297,13 @@ contract CBSC is Ownable, AccessControl {
         emit StateLog(_commitment_id, commitments[_commitment_id].state);
     }
 
-    function release(uint256 _commitment_id, string memory _operation)
+    function release(
+        address _creditor,
+        uint256 _commitment_id,
+        string memory _operation
+    )
         external
+        onlyCreditor(_creditor)
         commitmentIsCommitted(_commitment_id)
         operationIsAssign(_operation)
     {
@@ -294,5 +315,4 @@ contract CBSC is Ownable, AccessControl {
      * Trigger event to notify listeners that the state of a single commitment is requested
      */
     event StateLog(uint256 id, string state);
-    event PartialSatisfactionLog(uint256 balance);
 }

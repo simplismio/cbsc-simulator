@@ -323,7 +323,6 @@ contract("CBSC Simulation", async (accounts) => {
     await instance.satisfy(
       _action.commitments.fluents[0].id,
       _action.commitments.id,
-      _action.fulfillment_value,
       _action.operation,
       _time
     );
@@ -333,9 +332,60 @@ contract("CBSC Simulation", async (accounts) => {
     assert.equal(templateJson.Rule.signature, hash, "Saving signature failed");
   }
 
-  async function delegate() {}
+  async function partialSatisfy(_actionNumber, _time) {
+    // step 1: read the actions from the CBSC.app
+    let _action = await queryActionData(_actionNumber);
 
-  async function assign() {}
+    // step 2: create the CommitRuleMl file from the template
+    await createCommitRuleMLFile(_action, _time);
+
+    // step 3:
+    await instance.partialSatisfy(
+      _action.commitments.fluents[0].id,
+      _action.commitments.id,
+      _action.fulfillment_value - 2,
+      _action.operation,
+      _time
+    );
+
+    templateJson.Rule.signature = hash;
+    assert.equal("activate", state, "Saving (partial) satisfy state failed");
+    assert.equal(templateJson.Rule.signature, hash, "Saving signature failed");
+  }
+
+  async function cancel(_actionNumber, _debtor, _time) {
+    // step 1: read the actions from the CBSC.app
+    let _action = await queryActionData(_actionNumber);
+
+    // step 2: create the CommitRuleMl file from the template
+    await createCommitRuleMLFile(_action, _time);
+
+    // step 3:
+    await instance.cancel(_debtor, _action.commitments.id, _action.operation);
+
+    templateJson.Rule.signature = hash;
+    assert.equal(_action.transition, state, "Saving cancel state failed");
+    assert.equal(templateJson.Rule.signature, hash, "Saving signature failed");
+  }
+
+  async function release(_actionNumber, _creditor, _time) {
+    // step 1: read the actions from the CBSC.app
+    let _action = await queryActionData(_actionNumber);
+
+    // step 2: create the CommitRuleMl file from the template
+    await createCommitRuleMLFile(_action, _time);
+
+    // step 3:
+    await instance.release(
+      _creditor,
+      _action.commitments.id,
+      _action.operation
+    );
+
+    templateJson.Rule.signature = hash;
+    assert.equal(_action.transition, state, "Saving release state failed");
+    assert.equal(templateJson.Rule.signature, hash, "Saving signature failed");
+  }
 
   before("Preparing CBSC", async () => {
     instance = await CBSC.deployed();
@@ -345,8 +395,8 @@ contract("CBSC Simulation", async (accounts) => {
      * Optional functions to delegate or assign
      */
     await instance.setupRoles(debtor, creditor);
-    //await instance.grantdebtorRole(xz);
-    //await instance.grantcreditorRole(xy);
+    //await instance.grantDebtorRole(xz);
+    //await instance.grantCreditorRole(yz);
 
     instance.StateLog({}, async (error, result) => {
       if (error) {
@@ -361,110 +411,14 @@ contract("CBSC Simulation", async (accounts) => {
         console.log();
       }
     });
-
-    instance.PartialSatisfactionLog({}, async (error, result) => {
-      if (error) {
-        console.log(error);
-      }
-      if (result) {
-        balance = result.args.balance.words[0];
-        console.log(balance);
-      }
-    });
   });
 
-  // it("CBSC Protocol Run", async () => {
-  //   let _event_counter = 1;
-  //   let _db_action_counter = await getActionCounter();
-  //   let _code_action_counter = 1;
-  //   let _iteration = 0;
-
-  //   let _events = await queryEventData();
-
-  //   //while (_event_counter <= _events.length) {
-  //   // step 0: delete all existing commitruleml files
-  //   fs.readdir("test/commitruleml/run/", (err, files) => {
-  //     if (err) console.log(err);
-  //     for (const file of files) {
-  //       fs.unlinkSync("test/commitruleml/run/" + file);
-  //     }
-  //   });
-
-  //   // Read the actions from the CBSC app
-  //   let _action = await queryActionData(_db_action_counter);
-
-  //   // Create the CommitRuleMl file from the template
-  //   await createCommitRuleMLFile(
-  //     _action,
-  //     _event_counter,
-  //     _code_action_counter,
-  //     _iteration
-  //   );
-
-  //   let _time = 100;
-
-  //   // Switch case loop to manipulate the smart contract
-  //   switch (_action.transition) {
-  //     case "commit":
-  // await instance.commit(
-  //   _action.commitments.id,
-  //   _action.operation,
-  //   debtor,
-  //   creditor,
-  //   _action.commitments.fluents[0].id,
-  //   _action.commitments.fluents[0].balance,
-  //   _action.commitments.fluents[0].atomic,
-  //   _action.commitments.fluents[0].start,
-  //   _action.commitments.fluents[0].end
-  // );
-  //       break;
-  //     case "activate":
-  // await instance.activate(
-  //   _action.commitments.id,
-  //   _action.operation,
-  //   debtor,
-  //   creditor,
-  //   _action.commitments.fluents[0].id,
-  //   _action.commitments.fluents[0].balance,
-  //   _action.commitments.fluents[0].atomic,
-  //   _action.commitments.fluents[0].start,
-  //   _action.commitments.fluents[0].end
-  // );
-  //       break;
-  //     case "satisfy":
-  //       await instance.satisfy(
-  //         //_action.commitments.fluents[0].id,
-  //         _action.commitments.id,
-  //         _action.fulfillment_value,
-  //         _action.operation,
-  //         _time,
-  //         _action.commitments.fluents[0].start,
-  //         _action.commitments.fluents[0].end
-  //       );
-  //       break;
-  //     default:
-  //   }
-
-  //   templateJson.Rule.signature = hash;
-  //   assert.equal(_action.transition, state, "Saving state failed");
-  //   assert.equal(templateJson.Rule.signature, hash, "Saving signature failed");
-
-  //   if (_event_counter > _events.length) {
-  //     console.log("Protocol run completed");
-  //   }
-
-  //   _db_action_counter++;
-  //   _code_action_counter++;
-  //   //}
-  // });
-
-  let _test = 3;
-  let _time = 100;
+  let _test = 1;
 
   if (_test == 1) {
     it("Test 1: Commit a commitment", async () => {
       await removeAllCommitRuleMlFiles();
-      await commit(9, debtor, creditor, 110);
+      await commit(9, creditor, creditor, 110);
     });
   }
 
@@ -480,6 +434,46 @@ contract("CBSC Simulation", async (accounts) => {
       await removeAllCommitRuleMlFiles();
       await activate(9, debtor, creditor, 110, 0);
       await satisfy(10, 120);
+      //await partialSatisfy(10, 120);
+    });
+  }
+
+  if (_test == 4) {
+    it("Test 4: Process a conditional commitment that resolves to commit", async () => {
+      await removeAllCommitRuleMlFiles();
+      await commit(8, debtor, creditor, 110);
+      await activate(9, debtor, creditor, 120, 0);
+      await satisfy(10, 130);
+      await commit(11, debtor, creditor, 140);
+    });
+  }
+
+  if (_test == 5) {
+    it("Test 5: Process a conditional commitment that resolves to activate", async () => {
+      await removeAllCommitRuleMlFiles();
+      await activate(9, debtor, creditor, 110, 0);
+      await satisfy(10, 120);
+      await activate(12, debtor, creditor, 130, 1);
+    });
+  }
+
+  if (_test == 6) {
+    it("Test 6: Delegate a commitment", async () => {
+      await removeAllCommitRuleMlFiles();
+      await commit(11, debtor, creditor, 110);
+      //await activate(9, debtor, creditor, 110, 1);
+      //await instance.revokeDebtorRole(debtor);
+      await cancel(13, debtor, 120);
+    });
+  }
+
+  if (_test == 7) {
+    it("Test 7: Assign a commitment", async () => {
+      await removeAllCommitRuleMlFiles();
+      await commit(11, debtor, creditor, 110);
+      //await activate(9, debtor, creditor, 110, 1);
+      //await instance.revokeCreditorRole(creditor);
+      await release(14, creditor, 120);
     });
   }
 });

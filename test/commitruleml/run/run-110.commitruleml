@@ -30,7 +30,7 @@
                     <Fluent id="13" title="post job" balance="3" atomic="false" terms_left="2">
                         <original_balance></original_balance>
                         <Start event="100"></Start>
-                        <End event="100"></End>
+                        <End event="130"></End>
                     </Fluent>
                 </Commitment>
             </Action>
@@ -44,7 +44,7 @@
                     <Fluent id="13" title="post job" balance="3" atomic="false" terms_left="2">
                         <original_balance></original_balance>
                         <Start event="100"></Start>
-                        <End event="100"></End>
+                        <End event="130"></End>
                     </Fluent>
                 </Commitment>
             </Action>
