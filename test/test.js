@@ -61,7 +61,7 @@ contract("CBSC Simulation", async (accounts) => {
     return action[0];
   }
 
-  async function writeRuleMLOutput(time, json) {
+  async function writeCommitRuleMLOutput(time, json) {
     /*
      * Write transaction hash back protocol run and store it in bc-output.xml
      * */
@@ -244,7 +244,7 @@ contract("CBSC Simulation", async (accounts) => {
     templateJson.Rule.Assert.do.Action.Commitment.Fluent.End.action = end[1];
     templateJson.Rule.Assert.do.Action.Commitment.Fluent.End.iteration = end[2];
 
-    await writeRuleMLOutput(_time, templateJson);
+    await writeCommitRuleMLOutput(_time, templateJson);
   }
 
   async function removeAllCommitRuleMlFiles() {
@@ -413,12 +413,15 @@ contract("CBSC Simulation", async (accounts) => {
     });
   });
 
-  let _test = 1;
+  /*
+ * Define which test is ran for the simulation. Each test confirms to equally named EC rules
+ */
+  let _test = 7;
 
   if (_test == 1) {
     it("Test 1: Commit a commitment", async () => {
       await removeAllCommitRuleMlFiles();
-      await commit(9, creditor, creditor, 110);
+      await commit(8, debtor, creditor, 110);
     });
   }
 
@@ -433,8 +436,8 @@ contract("CBSC Simulation", async (accounts) => {
     it("Test 3: Satisfy a commitment", async () => {
       await removeAllCommitRuleMlFiles();
       await activate(9, debtor, creditor, 110, 0);
-      await satisfy(10, 120);
-      //await partialSatisfy(10, 120);
+      //await satisfy(10, 120);
+      await partialSatisfy(10, 120);
     });
   }
 
@@ -460,20 +463,24 @@ contract("CBSC Simulation", async (accounts) => {
   if (_test == 6) {
     it("Test 6: Delegate a commitment", async () => {
       await removeAllCommitRuleMlFiles();
-      await commit(11, debtor, creditor, 110);
-      //await activate(9, debtor, creditor, 110, 1);
-      //await instance.revokeDebtorRole(debtor);
-      await cancel(13, debtor, 120);
+      await commit(8, debtor, creditor, 110);
+      //await activate(9, debtor, creditor, 110, 0);
+      await cancel(13, creditor, 120);
+      await instance.revokeDebtorRole(debtor);
+      await instance.grantDebtorRole(xz);
+      await commit(11, xz, creditor, 130);
     });
   }
 
   if (_test == 7) {
     it("Test 7: Assign a commitment", async () => {
       await removeAllCommitRuleMlFiles();
-      await commit(11, debtor, creditor, 110);
-      //await activate(9, debtor, creditor, 110, 1);
-      //await instance.revokeCreditorRole(creditor);
+      //await commit(8, debtor, creditor, 110);
+      await activate(9, debtor, creditor, 110, 1);
       await release(14, creditor, 120);
+      await instance.revokeCreditorRole(creditor);
+      await instance.grantCreditorRole(yz);
+      await commit(11, debtor, yz, 130);
     });
   }
 });

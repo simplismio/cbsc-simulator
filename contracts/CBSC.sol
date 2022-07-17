@@ -8,17 +8,20 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract CBSC is Ownable, AccessControl {
+    /*
+     * State management Structs and Mappings
+     */
+
     struct Commitment {
-        address debtor;
-        address creditor;
         string state;
     }
 
     struct Fluent {
         uint256 commitment_id;
+        bool atomic;
         uint256 value;
         uint256 balance;
-        bool atomic;
+        uint256 terms; 
         uint256 start;
         uint256 end;
     }
@@ -136,10 +139,10 @@ contract CBSC is Ownable, AccessControl {
     /*
      * Modifier to verify that a the operation is Confirmed
      */
-    modifier operationIsConfirm(string memory _operation) {
+    modifier operationIsStart(string memory _operation) {
         require(
             keccak256(abi.encodePacked(_operation)) ==
-                keccak256(abi.encodePacked("confirm")),
+                keccak256(abi.encodePacked("start")),
             "Modifier operationIsConsidered failed"
         );
         _;
@@ -209,7 +212,6 @@ contract CBSC is Ownable, AccessControl {
         uint256 _commitment_id,
         string memory _operation,
         address _debtor,
-        address _creditor,
         uint256 _fluent_id,
         uint256 _value,
         bool _atomic,
@@ -217,8 +219,7 @@ contract CBSC is Ownable, AccessControl {
         uint256 _end
     ) external onlyDebtor(_debtor) operationIsConsider(_operation) {
         commitments[_commitment_id].state = "commit";
-        commitments[_commitment_id].debtor = _debtor;
-        commitments[_commitment_id].creditor = _creditor;
+        fluents[_fluent_id].commitment_id = _commitment_id;
         fluents[_fluent_id].value = _value;
         fluents[_fluent_id].balance = _value;
         fluents[_fluent_id].atomic = _atomic;
@@ -231,16 +232,13 @@ contract CBSC is Ownable, AccessControl {
         uint256 _commitment_id,
         string memory _operation,
         address _debtor,
-        address _creditor,
         uint256 _fluent_id,
         uint256 _value,
         bool _atomic,
         uint256 _start,
         uint256 _end
-    ) external onlyDebtor(_debtor) operationIsConfirm(_operation) {
+    ) external onlyDebtor(_debtor) operationIsStart(_operation) {
         commitments[_commitment_id].state = "activate";
-        commitments[_commitment_id].debtor = _debtor;
-        commitments[_commitment_id].creditor = _creditor;
         fluents[_fluent_id].value = _value;
         fluents[_fluent_id].balance = _value;
         fluents[_fluent_id].atomic = _atomic;
